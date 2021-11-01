@@ -26,9 +26,7 @@ export class Usuario extends Entity {
   @property({
     type: 'string',
     required: true,
-    index:{
-      unique: true
-    }
+    unique: true,
   })
   correo: string;
 

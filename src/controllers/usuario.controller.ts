@@ -19,6 +19,8 @@ import {
   response,
 } from '@loopback/rest';
 import {Usuario} from '../models';
+import { CambioClave } from '../models/cambio-clave.model';
+import { CredencialesRecuperarClave } from '../models/credenciales-recuperar-clave.model';
 import { Credenciales } from '../models/credenciales.model';
 import {UsuarioRepository} from '../repositories';
 import { AdministradorClaveService } from '../services';
@@ -42,26 +44,34 @@ export class UsuarioController {
         'application/json': {
           schema: getModelSchemaRef(Usuario, {
             title: 'NewUsuario',
-            exclude: ['_id']
+            exclude: ['_id'],
 
           }),
         },
       },
     })
     usuario: Omit<Usuario, '_id'>,
-  ): Promise<Usuario> {
+  ): Promise<Usuario | null> {
     //Se verifica si el usuario ingreso clave, si no se crea una aleatoreamente
-    
-      //Creacion de la clave 
-      let clave = this.servicioClaves.CrearClaveAleatoria();
-      // console.log(clave);
-      
-      let claveCifrada = this.servicioClaves.CifrarTexto(clave);
-      usuario.password = claveCifrada
-      let usuarioCreado = this.usuarioRepository.create(usuario);
-
+      let busqueda = await this.usuarioRepository.findOne({
+        where: {
+          correo: usuario.correo,
+        }
+      })
+      if (!busqueda) {
+        //Creacion de la clave 
+        let clave = this.servicioClaves.CrearClaveAleatoria();
+        console.log(clave);
+        
+        let claveCifrada = this.servicioClaves.CifrarTexto(clave);
+        usuario.password = claveCifrada
+        let usuarioCreado = this.usuarioRepository.create(usuario);
+        return usuarioCreado
+      }
+      console.log("Correo en uso");
+      return null
       //Enviar clave por correo electronico
-      return usuario
+      
   }
 
   @get('/usuarios/count')
@@ -183,10 +193,11 @@ export class UsuarioController {
     })
     credenciales: Credenciales,
   ): Promise<Usuario | null> {
+    let claveCifrada = this.servicioClaves.CifrarTexto(credenciales.clave);
     let usuario = await this.usuarioRepository.findOne({
       where: {
         correo: credenciales.usuario,
-        password: credenciales.clave
+        password: claveCifrada
       }
     })
     if (usuario) {
@@ -196,5 +207,78 @@ export class UsuarioController {
     // console.log(usuario)
     return usuario;
   }
+
+  @post('/recuperar-clave')
+  @response(200, {
+    description: 'Recuperar clave de usuarios',
+    content: {
+      'application/json': { schema: getModelSchemaRef(CredencialesRecuperarClave)}},
+    })
+  async recuperarClave(
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: getModelSchemaRef(CredencialesRecuperarClave, {
+            title: 'Recuperar clave de usuario'
+          }),
+        },
+      },
+    })
+    credenciales: CredencialesRecuperarClave,
+  ): Promise<Usuario | null> {
+    let usuario = await this.usuarioRepository.findOne({
+      where:{
+        correo: credenciales.correo,
+      }
+    })
+    if (usuario) {
+      const clave = this.servicioClaves.CrearClaveAleatoria();
+      usuario.password = this.servicioClaves.CifrarTexto(clave);
+      await this.usuarioRepository.updateById(usuario._id, usuario)
+      //invocar al servicio de notificaciones para enviar SMS al usuario con la nueva clave
+      //let datos = new NotificacionSms();
+      //datos.destino = usuario.celular;
+      //datos.mensaje = `Hola ${usuario.nombre} <br> ${Configuracion.mensajeRecuperar} <br> ${clave}`
+      //this.servicioNotificaciones.EnviarSms(datos);
+      console.log("¡Clave creada exitosamente! "+" Su nueva clave es: "+clave );
+    }
+    console.log("¡Clave creada exitosamente! "+" Su nueva clave es: "+usuario?.password );
+    
+    return usuario;
+  }
+
+
+  @post('/cambiar-clave')
+  @response(200, {
+    description: 'Cambio de clave de usuarios',
+    content: { 'application/json': { schema: getModelSchemaRef(CambioClave) } },
+  })
+  async cambiarClave(
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: getModelSchemaRef(CambioClave, {
+            title: 'Cambio de clave usuario'
+          }),
+        },
+      },
+    })
+    credencialesClave: CambioClave,
+  ): Promise<Boolean> {
+
+    let usuario = await this.servicioClaves.CambiarClave(credencialesClave);
+    if (usuario) {
+      //invocar al servicio de notificaciones para enviar correo al usuario
+      // let datos = new NotificacionCorreo();
+      // datos.destino = usuario.correo;
+      // datos.asunto = Configuracion.asuntoCambioClave;
+      // datos.mensaje = `Hola ${usuario.nombre} <br> ${Configuracion.mensajeCambioClave}`
+      // this.servicioNotificaciones.EnviarCorreo(datos);
+    }
+
+    return usuario != null;
+  }
+
+  
 
 }
