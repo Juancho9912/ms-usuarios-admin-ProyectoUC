@@ -18,25 +18,30 @@ import {
   requestBody,
   response,
 } from '@loopback/rest';
-import {Usuario} from '../models';
+import { Configuracion } from '../keys/config';
+import { NotificacionSms, Usuario } from '../models';
 import { CambioClave } from '../models/cambio-clave.model';
 import { CredencialesRecuperarClave } from '../models/credenciales-recuperar-clave.model';
 import { Credenciales } from '../models/credenciales.model';
-import {UsuarioRepository} from '../repositories';
+import { NotificacionCorreo } from '../models/notificacion-correo.model';
+import { UsuarioRepository } from '../repositories';
 import { AdministradorClaveService } from '../services';
+import { NotificacionesService } from '../services/notificaciones.service';
 
 export class UsuarioController {
   constructor(
     @repository(UsuarioRepository)
-    public usuarioRepository : UsuarioRepository,
+    public usuarioRepository: UsuarioRepository,
     @service(AdministradorClaveService)
-    public servicioClaves : AdministradorClaveService,
-  ) {}
+    public servicioClaves: AdministradorClaveService,
+    @service(NotificacionesService)
+    public servicioNotificaciones: NotificacionesService,
+  ) { }
 
   @post('/usuarios')
   @response(200, {
     description: 'Usuario model instance',
-    content: {'application/json': {schema: getModelSchemaRef(Usuario)}},
+    content: { 'application/json': { schema: getModelSchemaRef(Usuario) } },
   })
   async create(
     @requestBody({
@@ -53,31 +58,37 @@ export class UsuarioController {
     usuario: Omit<Usuario, '_id'>,
   ): Promise<Usuario | null> {
     //Se verifica si el usuario ingreso clave, si no se crea una aleatoreamente
-      let busqueda = await this.usuarioRepository.findOne({
-        where: {
-          correo: usuario.correo,
-        }
-      })
-      if (!busqueda) {
-        //Creacion de la clave 
-        let clave = this.servicioClaves.CrearClaveAleatoria();
-        console.log(clave);
-        
-        let claveCifrada = this.servicioClaves.CifrarTexto(clave);
-        usuario.password = claveCifrada
-        let usuarioCreado = this.usuarioRepository.create(usuario);
-        return usuarioCreado
+    let busqueda = await this.usuarioRepository.findOne({
+      where: {
+        correo: usuario.correo,
       }
-      console.log("Correo en uso");
-      return null
-      //Enviar clave por correo electronico
-      
+    })
+    if (!busqueda) {
+      //Creacion de la clave 
+      let clave = this.servicioClaves.CrearClaveAleatoria();
+      console.log(clave);
+
+      let claveCifrada = this.servicioClaves.CifrarTexto(clave);
+      usuario.password = claveCifrada
+      let usuarioCreado = this.usuarioRepository.create(usuario);
+
+      const correo = new NotificacionCorreo();
+      correo.destino = usuario.correo;
+      correo.asunto = Configuracion.asuntoCambioClave;
+      correo.mensaje = `Hola ${usuario.nombre} <br> ${Configuracion.mensajeRegistro} ${clave}`
+      this.servicioNotificaciones.EnviarCorreo(correo)
+      return usuarioCreado
+    }
+    console.log("Correo en uso");
+    return null
+    //Enviar clave por correo electronico
+
   }
 
   @get('/usuarios/count')
   @response(200, {
     description: 'Usuario model count',
-    content: {'application/json': {schema: CountSchema}},
+    content: { 'application/json': { schema: CountSchema } },
   })
   async count(
     @param.where(Usuario) where?: Where<Usuario>,
@@ -92,7 +103,7 @@ export class UsuarioController {
       'application/json': {
         schema: {
           type: 'array',
-          items: getModelSchemaRef(Usuario, {includeRelations: true}),
+          items: getModelSchemaRef(Usuario, { includeRelations: true }),
         },
       },
     },
@@ -106,13 +117,13 @@ export class UsuarioController {
   @patch('/usuarios')
   @response(200, {
     description: 'Usuario PATCH success count',
-    content: {'application/json': {schema: CountSchema}},
+    content: { 'application/json': { schema: CountSchema } },
   })
   async updateAll(
     @requestBody({
       content: {
         'application/json': {
-          schema: getModelSchemaRef(Usuario, {partial: true}),
+          schema: getModelSchemaRef(Usuario, { partial: true }),
         },
       },
     })
@@ -127,13 +138,13 @@ export class UsuarioController {
     description: 'Usuario model instance',
     content: {
       'application/json': {
-        schema: getModelSchemaRef(Usuario, {includeRelations: true}),
+        schema: getModelSchemaRef(Usuario, { includeRelations: true }),
       },
     },
   })
   async findById(
     @param.path.string('id') id: string,
-    @param.filter(Usuario, {exclude: 'where'}) filter?: FilterExcludingWhere<Usuario>
+    @param.filter(Usuario, { exclude: 'where' }) filter?: FilterExcludingWhere<Usuario>
   ): Promise<Usuario> {
     return this.usuarioRepository.findById(id, filter);
   }
@@ -147,7 +158,7 @@ export class UsuarioController {
     @requestBody({
       content: {
         'application/json': {
-          schema: getModelSchemaRef(Usuario, {partial: true}),
+          schema: getModelSchemaRef(Usuario, { partial: true }),
         },
       },
     })
@@ -175,7 +186,7 @@ export class UsuarioController {
     await this.usuarioRepository.deleteById(id);
   }
   //--------------------- CREACION DE NUEVOS METODOS ------------------------------------------
-  
+
   @post('/identificar-usuario')
   @response(200, {
     description: 'Identificacion de usuarios',
@@ -212,8 +223,9 @@ export class UsuarioController {
   @response(200, {
     description: 'Recuperar clave de usuarios',
     content: {
-      'application/json': { schema: getModelSchemaRef(CredencialesRecuperarClave)}},
-    })
+      'application/json': { schema: getModelSchemaRef(CredencialesRecuperarClave) }
+    },
+  })
   async recuperarClave(
     @requestBody({
       content: {
@@ -227,7 +239,7 @@ export class UsuarioController {
     credenciales: CredencialesRecuperarClave,
   ): Promise<Usuario | null> {
     let usuario = await this.usuarioRepository.findOne({
-      where:{
+      where: {
         correo: credenciales.correo,
       }
     })
@@ -236,14 +248,14 @@ export class UsuarioController {
       usuario.password = this.servicioClaves.CifrarTexto(clave);
       await this.usuarioRepository.updateById(usuario._id, usuario)
       //invocar al servicio de notificaciones para enviar SMS al usuario con la nueva clave
-      //let datos = new NotificacionSms();
-      //datos.destino = usuario.celular;
-      //datos.mensaje = `Hola ${usuario.nombre} <br> ${Configuracion.mensajeRecuperar} <br> ${clave}`
-      //this.servicioNotificaciones.EnviarSms(datos);
-      console.log("¡Clave creada exitosamente! "+" Su nueva clave es: "+clave );
+      let datos = new NotificacionSms();
+      datos.destino = usuario.telefono;
+      datos.mensaje = `Hola ${usuario.nombre} ${Configuracion.mensajeRecuperar} ${clave}`
+      this.servicioNotificaciones.EnviarSms(datos);
+      // console.log("¡Clave creada exitosamente! " + " Su nueva clave es: " + clave);
     }
-    console.log("¡Clave creada exitosamente! "+" Su nueva clave es: "+usuario?.password );
-    
+    // console.log("¡Clave creada exitosamente! " + " Su nueva clave es: " + usuario?.password);
+
     return usuario;
   }
 
@@ -269,16 +281,16 @@ export class UsuarioController {
     let usuario = await this.servicioClaves.CambiarClave(credencialesClave);
     if (usuario) {
       //invocar al servicio de notificaciones para enviar correo al usuario
-      // let datos = new NotificacionCorreo();
-      // datos.destino = usuario.correo;
-      // datos.asunto = Configuracion.asuntoCambioClave;
-      // datos.mensaje = `Hola ${usuario.nombre} <br> ${Configuracion.mensajeCambioClave}`
-      // this.servicioNotificaciones.EnviarCorreo(datos);
+      let datos = new NotificacionCorreo();
+      datos.destino = usuario.correo;
+      datos.asunto = Configuracion.asuntoCambioClave;
+      datos.mensaje = `Hola ${usuario.nombre} <br> ${Configuracion.mensajeCambioClave}`
+      this.servicioNotificaciones.EnviarCorreo(datos);
     }
 
     return usuario != null;
   }
 
-  
+
 
 }

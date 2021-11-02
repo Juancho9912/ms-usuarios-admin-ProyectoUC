@@ -22,6 +22,12 @@ export class Usuario extends Entity {
     required: true,
   })
   apellidos: string;
+  
+  @property({
+    type: 'string',
+    required: true,
+  })
+  telefono: string;
 
   @property({
     type: 'string',

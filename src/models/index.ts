@@ -6,3 +6,5 @@ export * from './permiso-rol.model';
 export * from './credenciales.model';
 export * from './credenciales-recuperar-clave.model';
 export * from './cambio-clave.model';
+export * from './notificacion-correo.model';
+export * from './notificacion-sms.model';
