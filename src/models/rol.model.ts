@@ -1,6 +1,5 @@
 import {Entity, model, property, hasMany} from '@loopback/repository';
 import {Usuario} from './usuario.model';
-import {UsuarioRol} from './usuario-rol.model';
 import {Permiso} from './permiso.model';
 import {PermisoRol} from './permiso-rol.model';
 
@@ -18,9 +17,6 @@ export class Rol extends Entity {
     required: true,
   })
   nombre: string;
-
-  @hasMany(() => Usuario, {through: {model: () => UsuarioRol, keyFrom: 'id_rol', keyTo: 'id_usuario'}})
-  usuarios: Usuario[];
 
   @hasMany(() => Permiso, {through: {model: () => PermisoRol, keyFrom: 'id_rol', keyTo: 'id_permiso'}})
   permisos: Permiso[];

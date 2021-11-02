@@ -1,8 +1,7 @@
 import {inject, Getter} from '@loopback/core';
-import {DefaultCrudRepository, repository, HasManyThroughRepositoryFactory} from '@loopback/repository';
+import {DefaultCrudRepository, repository, HasManyThroughRepositoryFactory, BelongsToAccessor} from '@loopback/repository';
 import {MongodbDataSource} from '../datasources';
-import {Usuario, UsuarioRelations, Rol, UsuarioRol} from '../models';
-import {UsuarioRolRepository} from './usuario-rol.repository';
+import {Usuario, UsuarioRelations, Rol} from '../models';
 import {RolRepository} from './rol.repository';
 
 export class UsuarioRepository extends DefaultCrudRepository<
@@ -11,16 +10,13 @@ export class UsuarioRepository extends DefaultCrudRepository<
   UsuarioRelations
 > {
 
-  public readonly rols: HasManyThroughRepositoryFactory<Rol, typeof Rol.prototype._id,
-          UsuarioRol,
-          typeof Usuario.prototype._id
-        >;
+  public readonly tiene: BelongsToAccessor<Rol, typeof Usuario.prototype._id>;
 
   constructor(
-    @inject('datasources.mongodb') dataSource: MongodbDataSource, @repository.getter('UsuarioRolRepository') protected usuarioRolRepositoryGetter: Getter<UsuarioRolRepository>, @repository.getter('RolRepository') protected rolRepositoryGetter: Getter<RolRepository>,
+    @inject('datasources.mongodb') dataSource: MongodbDataSource, @repository.getter('RolRepository') protected rolRepositoryGetter: Getter<RolRepository>,
   ) {
     super(Usuario, dataSource);
-    this.rols = this.createHasManyThroughRepositoryFactoryFor('rols', rolRepositoryGetter, usuarioRolRepositoryGetter,);
-    this.registerInclusionResolver('rols', this.rols.inclusionResolver);
+    this.tiene = this.createBelongsToAccessorFor('tiene', rolRepositoryGetter,);
+    this.registerInclusionResolver('tiene', this.tiene.inclusionResolver);
   }
 }
