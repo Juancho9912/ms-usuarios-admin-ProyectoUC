@@ -25,7 +25,7 @@ import { CredencialesRecuperarClave } from '../models/credenciales-recuperar-cla
 import { Credenciales } from '../models/credenciales.model';
 import { NotificacionCorreo } from '../models/notificacion-correo.model';
 import { UsuarioRepository } from '../repositories';
-import { AdministradorClaveService } from '../services';
+import { AdministradorClaveService, VerificarUsuarioService } from '../services';
 import { NotificacionesService } from '../services/notificaciones.service';
 
 export class UsuarioController {
@@ -36,6 +36,8 @@ export class UsuarioController {
     public servicioClaves: AdministradorClaveService,
     @service(NotificacionesService)
     public servicioNotificaciones: NotificacionesService,
+    @service(VerificarUsuarioService)
+    public verificarUsuario: VerificarUsuarioService,
   ) { }
 
   @post('/usuarios')
@@ -203,20 +205,19 @@ export class UsuarioController {
       },
     })
     credenciales: Credenciales,
-  ): Promise<Usuario | null> {
-    let claveCifrada = this.servicioClaves.CifrarTexto(credenciales.clave);
-    let usuario = await this.usuarioRepository.findOne({
-      where: {
-        correo: credenciales.usuario,
-        password: claveCifrada
-      }
-    })
+  ): Promise<Object | null> {
+    const usuario = await this.verificarUsuario.VerificarUsuario(credenciales)
+    let token = ''
     if (usuario) {
       usuario.password = '';
       //generar token y agregarlo a la respuesta
+      token = await this.verificarUsuario.GenerarToken(usuario)
     }
     // console.log(usuario)
-    return usuario;
+    return {
+      token: token,
+      usuario: usuario
+    };
   }
 
   @post('/recuperar-clave')
