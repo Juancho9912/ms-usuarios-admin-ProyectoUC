@@ -50,7 +50,7 @@ export class Usuario extends Entity {
   password?: string;
 
   @property({
-    type: 'date',
+    type: 'string',
     required: true,
   })
   fechaNacimiento: string;

@@ -76,7 +76,7 @@ export class UsuarioController {
 
       const correo = new NotificacionCorreo();
       correo.destino = usuario.correo;
-      correo.asunto = Configuracion.asuntoCambioClave;
+      correo.asunto = Configuracion.asuntoCreacionUsuario;
       correo.mensaje = `Hola ${usuario.nombre} <br> ${Configuracion.mensajeRegistro} ${clave}`
       this.servicioNotificaciones.EnviarCorreo(correo)
       return usuarioCreado
